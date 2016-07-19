@@ -27,9 +27,11 @@ func TestMetadataHandler(t *testing.T) {
 	// - the Group's custom metadata and selectors are served
 	// - key names are upper case
 	expectedData := map[string]string{
+		// group metadata
 		"POD_NETWORK":  "10.2.0.0/16",
 		"SERVICE_NAME": "etcd2",
-		"UUID":         "a1b2c3d4",
+		// group selector
+		"UUID": "a1b2c3d4",
 	}
 	assert.Equal(t, http.StatusOK, w.Code)
 	// convert response (random order) to map (tests compare in order)
@@ -57,11 +59,11 @@ func TestMetadataHandler_MetadataEdgeCases(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/", nil)
 		h.ServeHTTP(ctx, w, req)
-		// assert that:
-		// - the Group's custom metadata is served
+		// assert that each Group's metadata is formatted:
 		// - key names are upper case
+		// - key/value pairs are newline separated
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, c.expected, w.Body.String())
+		assert.Contains(t, w.Body.String(), c.expected)
 		assert.Equal(t, plainContentType, w.HeaderMap.Get(contentType))
 	}
 }
@@ -85,6 +87,10 @@ func metadataToMap(metadata string) map[string]string {
 		token := scanner.Text()
 		pair := strings.SplitN(token, "=", 2)
 		if len(pair) != 2 {
+			continue
+		}
+		// HACK(dghubble) - map unwinding will be supported with #84
+		if pair[0] == "REQUEST" {
 			continue
 		}
 		data[pair[0]] = pair[1]
